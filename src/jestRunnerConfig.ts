@@ -4,14 +4,41 @@ import * as vscode from 'vscode';
 import { isWindows, normalizePath, quote } from './util';
 import { existsSync } from 'fs';
 
+interface Configuration {
+  get<T>(section: string): T | undefined;
+}
+
 export class JestRunnerConfig {
+  get configuration(): Configuration {
+    let currentFolderPath: string = path.dirname(vscode.window.activeTextEditor.document.fileName);
+    let currentFolderConfigPath: string;
+    do {
+      currentFolderConfigPath = path.join(currentFolderPath, '.vscode/settings.json');
+      if (fs.existsSync(currentFolderConfigPath)) {
+        break;
+      }
+      currentFolderPath = path.join(currentFolderPath, '..');
+    } while (currentFolderPath !== this.currentWorkspaceFolderPath);
+
+    return {
+      get: <T>(section: string): T => {
+        if (fs.existsSync(currentFolderConfigPath)) {
+          const content = fs.readFileSync(currentFolderConfigPath, 'utf-8');
+          const config = JSON.parse(content);
+          return config[section];
+        }
+        return null;
+      },
+    };
+  }
+
   /**
    * The command that runs jest.
    * Defaults to: node "node_modules/.bin/jest"
    */
   public get jestCommand(): string {
     // custom
-    const jestCommand: string = vscode.workspace.getConfiguration().get('jestrunner.jestCommand');
+    const jestCommand: string = this.configuration.get('jestrunner.jestCommand');
     if (jestCommand) {
       return jestCommand;
     }
@@ -25,12 +52,12 @@ export class JestRunnerConfig {
   }
 
   public get changeDirectoryToWorkspaceRoot(): boolean {
-    return vscode.workspace.getConfiguration().get('jestrunner.changeDirectoryToWorkspaceRoot');
+    return this.configuration.get('jestrunner.changeDirectoryToWorkspaceRoot');
   }
 
   public get jestBinPath(): string {
     // custom
-    let jestPath: string = vscode.workspace.getConfiguration().get('jestrunner.jestPath');
+    let jestPath: string = this.configuration.get('jestrunner.jestPath');
     if (jestPath) {
       return jestPath;
     }
@@ -48,14 +75,12 @@ export class JestRunnerConfig {
   }
 
   public get projectPath(): string {
-    return vscode.workspace.getConfiguration().get('jestrunner.projectPath') || this.currentWorkspaceFolderPath;
+    return this.configuration.get('jestrunner.projectPath') || this.currentWorkspaceFolderPath;
   }
 
   public get cwd(): string {
     return (
-      vscode.workspace.getConfiguration().get('jestrunner.projectPath') ||
-      this.currentPackagePath ||
-      this.currentWorkspaceFolderPath
+      this.configuration.get('jestrunner.projectPath') || this.currentPackagePath || this.currentWorkspaceFolderPath
     );
   }
 
@@ -83,7 +108,7 @@ export class JestRunnerConfig {
 
   public get jestConfigPath(): string {
     // custom
-    const configPath: string = vscode.workspace.getConfiguration().get('jestrunner.configPath');
+    const configPath: string = this.configuration.get('jestrunner.configPath');
     if (!configPath) {
       return this.findConfigPath();
     }
@@ -94,7 +119,7 @@ export class JestRunnerConfig {
 
   getJestConfigPath(targetPath: string): string {
     // custom
-    const configPath: string = vscode.workspace.getConfiguration().get('jestrunner.configPath');
+    const configPath: string = this.configuration.get('jestrunner.configPath');
     if (!configPath) {
       return this.findConfigPath(targetPath);
     }
@@ -117,7 +142,7 @@ export class JestRunnerConfig {
   }
 
   public get runOptions(): string[] | null {
-    const runOptions = vscode.workspace.getConfiguration().get('jestrunner.runOptions');
+    const runOptions = this.configuration.get('jestrunner.runOptions');
     if (runOptions) {
       if (Array.isArray(runOptions)) {
         return runOptions;
@@ -131,7 +156,7 @@ export class JestRunnerConfig {
   }
 
   public get debugOptions(): Partial<vscode.DebugConfiguration> {
-    const debugOptions = vscode.workspace.getConfiguration().get('jestrunner.debugOptions');
+    const debugOptions = this.configuration.get('jestrunner.debugOptions');
     if (debugOptions) {
       return debugOptions;
     }
@@ -141,12 +166,12 @@ export class JestRunnerConfig {
   }
 
   public get isCodeLensDisabled(): boolean {
-    const isCodeLensDisabled: boolean = vscode.workspace.getConfiguration().get('jestrunner.disableCodeLens');
+    const isCodeLensDisabled: boolean = this.configuration.get('jestrunner.disableCodeLens');
     return isCodeLensDisabled ? isCodeLensDisabled : false;
   }
 
   public get isYarnPnpSupportEnabled(): boolean {
-    const isYarnPnp: boolean = vscode.workspace.getConfiguration().get('jestrunner.enableYarnPnpSupport');
+    const isYarnPnp: boolean = this.configuration.get('jestrunner.enableYarnPnpSupport');
     return isYarnPnp ? isYarnPnp : false;
   }
 
@@ -165,7 +190,7 @@ export class JestRunnerConfig {
   }
 
   public get isDetectYarnPnpJestBin(): boolean {
-    const isDetectYarnPnpJestBin: boolean = vscode.workspace.getConfiguration().get('jestrunner.detectYarnPnpJestBin');
+    const isDetectYarnPnpJestBin: boolean = this.configuration.get('jestrunner.detectYarnPnpJestBin');
     return isDetectYarnPnpJestBin ? isDetectYarnPnpJestBin : false;
   }
 
